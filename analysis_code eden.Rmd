@@ -1,0 +1,195 @@
+---
+title: "analysis code.R Eden"
+author: "Eden"
+date: "2025-09-17"
+output: html_document
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(readr)
+
+setwd("C:/Users/efrem/Downloads")  
+```
+
+## R Markdown
+
+
+
+```{r}
+# 1     
+# website link was (https://github.com/kijohnson/Advanced-Data-Analysis)
+#%20 is URL-encoding for a space character.
+
+C1survey <- read_csv(
+  "https://raw.githubusercontent.com/kijohnson/Advanced-Data-Analysis/main/Class%201%20Survey%20Fall%202025%202.csv",
+  show_col_types = FALSE
+)
+
+###2
+ dim(C1survey)
+####[1] 58 27
+### nrow(C1survey)       # rows only= 58
+###ncol(C1survey)       # columns only=27
+```
+
+
+```{r}
+##3 
+new_names <- c(
+  "id","like_cats","like_dogs","have_desert","slogan","fav_day","larkORowl",
+  "fav_food","fav_drink","fav_season","fav_month","hobby","program",
+  "specialization","stat_software","R_exp","coding_comfort","coding_length",
+  "top_three","public_health_interest","fav_num","bday","bmonth","country",
+  "state","city","highest_educ_level"
+)
+old_names <- names(C1survey)
+names(C1survey) <- new_names
+
+#b) 
+data.frame(old = old_names, new = names(C1survey))
+```
+
+```{r}
+## 4
+library(dplyr)
+
+summary_types <- tibble(
+  factor      = C1survey %>% select(where(~ is.factor(.x) || is.ordered(.x))) %>% ncol(),
+  integer     = C1survey %>% select(where(is.integer)) %>% ncol(),
+  numeric     = C1survey %>% select(where(~ is.numeric(.x) && !is.integer(.x))) %>% ncol(),
+  character   = C1survey %>% select(where(is.character)) %>% ncol(),
+  all_numeric = C1survey %>% select(where(is.numeric)) %>% ncol()   # optional
+)
+summary_types
+
+#factor integer numeric character all_numeric
+#<int>   <int>   <int>     <int>       <int>
+# 0       0       4        23           4
+```
+
+
+```{r}
+##5 
+table(C1survey$bday, useNA = "ifany")
+table(C1survey$bmonth, useNA = "ifany")
+ 
+
+#b there are a couple of results written as text instead of numeric so we need to make this consistent.
+
+# Convert to numeric
+C1survey <- C1survey %>%
+  mutate(
+    bdayc   = bday,
+    bmonthc = bmonth,
+    bdayc   = suppressWarnings(as.numeric(bday)),
+    bmonthc = suppressWarnings(as.numeric(bmonth))
+  )
+
+
+# check
+table(C1survey$bdayc, useNA = "ifany")
+table(C1survey$bmonthc, useNA = "ifany")
+
+```
+
+
+
+```{r}
+# c CLEANING and median 
+# removes impossible values (e.g., 0, 35, 13) but preserves valid entries.
+C1survey <- C1survey %>%
+  mutate(
+    bday   = ifelse(!is.na(bdayc)   & bdayc   >= 1 & bday   <= 31, bdayc,   NA_real_),
+    bmonth = ifelse(!is.na(bmonthc) & bmonthc >= 1 & bmonth <= 12, bmonthc, NA_real_)
+  )
+
+print(table(C1survey$bdayc, useNA = "ifany"))
+
+cat("\nTable of bmonth AFTER cleaning:\n")
+print(table(C1survey$bmonthc, useNA = "ifany"))
+
+# c) Medians (numeric, excluding NAs)
+median_bday   <- median(C1survey$bdayc,   na.rm = TRUE)
+median_bmonth <- median(C1survey$bmonthc, na.rm = TRUE)
+
+cat("\nMedian bday: ", median_bday, "\n", sep = "")
+cat("Median bmonth: ", median_bmonth, "\n", sep = "")
+
+```
+
+
+```{r}
+
+#6
+# 6) Create bseason, cross-check with bmonth, and sum columns
+
+#season according to Northern Meteorological season in which respondents were born 
+#(winter = 12/1 to 2/29, spring = 3/1 to 5/31, summer = 6/1 to 8/31, fall = 9/1 to 11/30).
+
+C1survey <- C1survey %>% mutate(bmonth = as.integer(bmonth))
+C1survey <- C1survey %>%
+  mutate(
+    bseason = case_when(
+      bmonthc %in% c(12, 1, 2) ~ "Winter",
+      bmonthc %in% 3:5         ~ "Spring",
+      bmonthc %in% 6:8         ~ "Summer",
+      bmonthc %in% 9:11        ~ "Fall",
+      TRUE                    ~ NA_character_
+    ),
+    bseason = factor(bseason, levels = c("Winter","Spring","Summer","Fall"))
+  )
+
+
+
+# (b) Seasons in columns, bmonths in rows (to check coding)
+tab_bmonth_bseason <- table(
+  bmonthc  = C1survey$bmonth,
+  bseason = C1survey$bseason,
+  useNA   = "ifany"
+)
+tab_bmonth_bseason
+
+# (c) Sum the columns (how many born in each season)
+tab_with_col_totals <- addmargins(tab_bmonth_bseason, margin = 2)
+tab_with_col_totals
+
+# print the season totals directly
+season_totals <- colSums(tab_bmonth_bseason, na.rm = TRUE)
+season_totals
+
+# answer Winter Spring Summer   Fall   <NA> 
+#            8     15     13     12     10 
+```
+
+```{r}
+#7 # 
+
+# what is the software of preference among cat lovers? 
+#Build a table of software preference among cat lovers
+cat_software <- C1survey %>%
+  
+  filter(tolower(trimws(as.character(like_cats))) %in% c("yes","y","true","1")) %>%
+  
+  mutate(
+    stat_software = as.character(stat_software),
+    stat_software = ifelse(is.na(stat_software) | stat_software == "",
+                           "(Missing)", stat_software)
+  ) %>%
+  # Count how many cat lovers reported each software (sorted by most common)
+  count(stat_software, name = "n", sort = TRUE) %>%
+  # Add a percent column (share of cat lovers)
+  mutate(pct = round(100 * n / sum(n), 1))
+cat_software
+
+# the software of preference among who like cats is SPSS(69.2 percent)
+
+```
+
+
+```{r}
+# write a csv file
+write.csv(C1survey, "C1survey.csv")
+```
+
