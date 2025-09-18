@@ -5,7 +5,7 @@ This repository includes the Class 1 survey dataset and R markdown code used to 
 
 ## Files Included
 - `class1_survey.csv`: Cleaned version of the Class 1 survey dataset
-- `analysis_code.Rmd`: R script used to summarize and visualize the data
+- `analysis_code eden.Rmd`: R script used to summarize and visualize the data
 - `README.md`: This file
 
 ## What the Code Does
